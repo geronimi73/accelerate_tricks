@@ -65,7 +65,10 @@ with accelerator.split_between_processes(prompts_all) as prompts:
     prompt_batches=prepare_prompts(prompts, tokenizer, batch_size=16)
 
     for prompts_tokenized in prompt_batches:
-        outputs_tokenized=model.generate(**prompts_tokenized, max_new_tokens=100)
+        outputs_tokenized=model.generate(
+            **prompts_tokenized, 
+            max_new_tokens=100,
+            pad_token_id=tokenizer.eos_token_id)
 
         # remove prompt from gen. tokens
         outputs_tokenized=[ tok_out[len(tok_in):] 
@@ -79,15 +82,6 @@ with accelerator.split_between_processes(prompts_all) as prompts:
         results["outputs"].extend(outputs)
         results["num_tokens"] += num_tokens
 
-    timediff=time.time()-start
-    print("GPU {}: {} prompts received, generated {} tokens in {} seconds, {} t/s".format(
-        accelerator.process_index,
-        len(prompts),
-        results["num_tokens"],
-        timediff,
-        results["num_tokens"]//timediff,
-        ))
-
     results=[ results ] # transform to list, otherwise gather_object() will not collect correctly
 
 results_gathered=gather_object(results)
@@ -98,6 +92,29 @@ if accelerator.is_main_process:
 
     print(f"tokens/sec: {num_tokens//timediff}, time elapsed: {timediff}, num_tokens {num_tokens}")
 
-write_pretty_json("inference_batched.json",results_gathered)
+# GPU 0: 100 prompts received, generated 10000 tokens in 19.21204710006714 seconds, 520.0 t/s
+# tokens/sec: 520.0, time elapsed: 19.21213436126709, num_tokens 10000
+
+# GPU 1: 50 prompts received, generated 5000 tokens in 11.014115571975708 seconds, 453.0 t/s
+# GPU 0: 50 prompts received, generated 5000 tokens in 11.108545303344727 seconds, 450.0 t/s
+# tokens/sec: 900.0, time elapsed: 11.109480381011963, num_tokens 10000
+
+# GPU 2: 32 prompts received, generated 3200 tokens in 6.120448350906372 seconds, 522.0 t/s
+# GPU 1: 34 prompts received, generated 3400 tokens in 8.22350263595581 seconds, 413.0 t/s
+# GPU 0: 34 prompts received, generated 3400 tokens in 8.295660495758057 seconds, 409.0 t/s
+# tokens/sec: 1205.0, time elapsed: 8.296635866165161, num_tokens 10000
+
+# GPU 0: 25 prompts received, generated 2500 tokens in 5.953023910522461 seconds, 419.0 t/s
+# GPU 2: 25 prompts received, generated 2500 tokens in 6.007809162139893 seconds, 416.0 t/s
+# GPU 3: 25 prompts received, generated 2500 tokens in 6.008904457092285 seconds, 416.0 t/s
+# GPU 1: 25 prompts received, generated 2500 tokens in 6.0392467975616455 seconds, 413.0 t/s
+# tokens/sec: 1655.0, time elapsed: 6.040315628051758, num_tokens 10000
+
+# GPU 1: 20 prompts received, generated 2000 tokens in 5.829110622406006 seconds, 343.0 t/s
+# GPU 4: 20 prompts received, generated 2000 tokens in 5.915517091751099 seconds, 338.0 t/s
+# GPU 0: 20 prompts received, generated 2000 tokens in 5.936866998672485 seconds, 336.0 t/s
+# GPU 3: 20 prompts received, generated 2000 tokens in 5.976394176483154 seconds, 334.0 t/s
+# GPU 2: 20 prompts received, generated 2000 tokens in 6.028886318206787 seconds, 331.0 t/s
+# tokens/sec: 1658.0, time elapsed: 6.030542612075806, num_tokens 10000
 
 
