@@ -1,3 +1,5 @@
+# note: doing it this way is stupid. https://github.com/huggingface/accelerate/issues/2029#issuecomment-1832339828
+
 from accelerate import Accelerator
 from accelerate.utils import gather_object, tqdm
 import time
